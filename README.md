@@ -1,13 +1,91 @@
 # DataBaseVet
 
-A veterinary clinic management system built with React and Node.js.
-
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
 - [Node.js](https://nodejs.org/en/) (LTS version)
 - [MySQL](https://www.mysql.com/)
 - npm (comes with Node.js)
+
+## Architecture Overview
+The system follows a typical three-tier architecture:
+
+1. Frontend: React.js application
+2. Backend: Node.js with Express
+3. Database: MySQL
+
+### Frontend (React.js)
+The frontend is built using React.js with the following key technologies:
+
+React Bootstrap for UI components and styling
+Axios for HTTP requests
+React Hooks for state management
+React Router (implied by navigation structure)
+
+A veterinary clinic management system built with React and Node.js.
+
+Key Components:
+
+1. Main Dashboard (App.js)
+
+- Central navigation hub
+- State management for view switching
+- Bootstrap-based responsive layout
+
+
+2. Module Components:
+
+- Mascotas (Pets)
+- Citas (Appointments)
+- Veterinarios (Veterinarians)
+- Facturas (Invoices)
+- Tratamientos (Treatments)
+
+
+
+### Backend (Node.js/Express)
+The backend server is built with Express.js and includes:
+
+1. Core Configuration:
+
+```
+javascriptCopyconst express = require("express");
+const app = express();
+const mysql = require("mysql2");
+const cors = require("cors");
+```
+
+
+2. Database Connection:
+
+```
+javascriptCopyconst db = mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "****",
+    database: "veterinaria"
+});
+```
+
+3. API Endpoints:
+
+- CRUD operations for all entities
+- Complex queries using views
+- Transaction management for data integrity
+
+
+
+### Database Structure
+The MySQL database includes the following main tables:
+
+mascotas (Pets)
+duenos (Owners)
+veterinarios (Veterinarians)
+citas (Appointments)
+facturas (Invoices)
+tratamientos (Treatments)
+especies (Species)
+especialidad (Specialties)
 
 ## Installation
 
