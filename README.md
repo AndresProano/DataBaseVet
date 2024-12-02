@@ -1,5 +1,9 @@
 # DataBaseVet
 
+## Problema que resuelve
+
+La base de datos mostrada en la imagen resuelve los problemas fundamentales de gestión en una clínica veterinaria, permitiendo el registro y seguimiento integral de pacientes animales, sus dueños y los servicios médicos prestados. A través de sus tablas principales y sus tablas de relación, el sistema facilita el control de citas médicas, el manejo de historiales clínicos, la administración de medicamentos, el seguimiento de tratamientos, y la gestión financiera mediante facturas. Además, las vistas especializadas permiten obtener información consolidada y detallada para la toma de decisiones, mejorando la eficiencia operativa de la clínica y la calidad de atención a las mascotas y sus propietarios.
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
