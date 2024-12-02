@@ -56,3 +56,5 @@ FLUSH PRIVILEGES;
 exit;"
 Finalmente, el error encontrado fue la incopatibilidad al instalar mysql@2.18.1, por lo que se procedió a utilizar msyql2 que funciona correctamente con las últimas versiones de MYSQL.
 
+9. Vamos a descargar React Bootstrap para poder tener un mejor manejo en la interface del programa. Para eso, vamos a colocar en el terminal del cliente "npm install react-bootstrap bootstrap". Y, dentro de App, bajo de axios vamos a colocar
+"import 'bootstrap/dist/css/bootstrap.min.css';"

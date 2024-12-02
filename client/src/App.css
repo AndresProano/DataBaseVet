@@ -1,35 +1,205 @@
+/* Estilos generales */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+  background-color: #f0f2f5;
+}
+
+/* Estilos de la App principal */
 .App {
-  text-align: center;
+  min-height: 100vh;
 }
 
+/* Estilos del header y menú principal */
 .App-header {
-  background-color: #282c34;
+  background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  gap: 1.5rem;
+  padding: 2rem;
 }
 
-.App-header button {
+/* Mejoras en los botones del menú principal */
+.menu-button {
   width: 320px;
-  height: 50px;
-  margin-top: 5px;
-}
-
-.Citas {
-  text-align: center;
-}
-
-.Citas-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  height: 60px;
+  margin: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
   color: white;
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.menu-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Estilos para el navbar */
+.navbar {
+  background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+  font-weight: 600;
+  font-size: 1.4rem !important;
+}
+
+/* Estilos para las cards */
+.card {
+  border-radius: 16px !important;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: none !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  background-color: #fff !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 16px 16px 0 0 !important;
+}
+
+/* Estilos para los formularios */
+.form-control, .form-select {
+  padding: 0.75rem !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  box-shadow: 0 0 0 0.25rem rgba(26, 35, 126, 0.25) !important;
+  border-color: #1a237e !important;
+}
+
+/* Estilos para los badges de estado */
+.badge {
+  padding: 0.5rem 1rem !important;
+  font-weight: 600 !important;
+  border-radius: 20px !important;
+  font-size: 0.875rem !important;
+}
+
+.badge.bg-warning {
+  background-color: #fff3cd !important;
+  color: #856404 !important;
+}
+
+.badge.bg-success {
+  background-color: #d4edda !important;
+  color: #155724 !important;
+}
+
+.badge.bg-danger {
+  background-color: #f8d7da !important;
+  color: #721c24 !important;
+}
+
+.badge.bg-info {
+  background-color: #cce5ff !important;
+  color: #004085 !important;
+}
+
+/* Estilos para los botones */
+.btn {
+  padding: 0.75rem 1.5rem !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Media queries */
+@media (max-width: 768px) {
+  .menu-button {
+    width: 90%;
+    max-width: 320px;
+  }
+
+  .card {
+    margin-bottom: 1rem;
+  }
+
+  .container {
+    padding: 1rem;
+  }
+}
+
+/* Mejoras en la legibilidad del texto */
+h1, h2, h3, h4, h5, h6 {
+  color: #1a237e;
+  font-weight: 600;
+}
+
+.text-muted {
+  color: #666 !important;
+}
+
+/* Estilos para el contenedor de citas */
+.citas-container {
+  padding: 2rem 0;
+}
+
+/* Mejoras en las tarjetas de citas */
+.cita-card {
+  height: 100%;
+}
+
+.cita-card .card-body {
+  padding: 1.5rem;
+}
+
+.cita-card .card-title {
+  color: #1a237e;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+/* Estilos para los grupos de formularios */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  font-weight: 500;
+  color: #1a237e;
+  margin-bottom: 0.5rem;
 }
