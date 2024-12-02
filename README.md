@@ -1,60 +1,220 @@
 # DataBaseVet
 
-# Ejecución del Proyecto
+A veterinary clinic management system built with React and Node.js.
 
-# Creación Proyecto
+## Prerequisites
 
-1. Dentro de nuestro repositorio creamos la carpeta "client" y "server"
+Before you begin, ensure you have the following installed:
+- [Node.js](https://nodejs.org/en/) (LTS version)
+- [MySQL](https://www.mysql.com/)
+- npm (comes with Node.js)
 
-2. Dentro de "client", ejecutamos npx create-react-app .
+## Installation
 
-3. Dentro de "server", ejecutamos npm init y presionaremos ENTER hasta la pregunta "Is this OK?(yes)" donde escribiremos YES y colocaremos ENTER.
+### 1. Database Setup
 
-4. En la carpeta SERVER crearemos un archivo, en este caso "index.js". El nombre puede variar a gusto de usuario, pero tendrá que llevar el mismo nombre que se encuentra dentro de package.json en el apartado de "main"
+1. Create a database named `veterinaria` in MySQL
+2. Import the database backup:
+   ```bash
+   mysql -u root -p veterinaria < veterinaria_backup.sql
+   ```
+3. Make sure you are in the same folder as the backup
 
-5. En la carpeta CLIENT, abriremos un terminar para colocar "npm start". Aquí deberiamos visualizar, dentro de google localhost:3000, que nuestra página web está corriendo. 
-El archivo donde se van a guardar los cambios que hagamos a nuestra página web es "\databasevet\client\src\app.js". Cualquier cosa que se escriba aquí se actualizará en tiempo real en nuestra página web.
-El archivo donde podemos editar la apariencia de nuestra página web y sus elementos es "\databasevet\client\src\App.css"
+### 2. Server Setup
 
-6. Antes de conectarnos a la base de datos necesitamos descargar MYSQL2, para ello 
-"npm install mysql2". Posteriormente, en el archivo de "\server\index.js" colocaremos
-"const mysql = require("mysql2");
+1. Navigate to the server directory:
+   ```bash
+   cd server
+   ```
 
+2. Start the server:
+   ```bash
+   node index.js
+   ```
+
+You should see the message:
+```
+Servidor corriendo en el puerto 3001
+Conexión exitosa a la base de datos MySQL
+```
+
+### 3. Client Setup
+
+1. Navigate to the client directory:
+   ```bash
+   cd client
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Start the client:
+   ```bash
+   npm start
+   ```
+
+The web application should automatically open in your default browser at `localhost:3000`.
+
+If you experience any issues, install additional packages:
+```bash
+npm install axios react-bootstrap bootstrap
+```
+
+## Project Structure
+
+```
+DataBaseVet/
+├── client/
+│   ├── src/
+│   │   ├── App.js        # Main application component
+│   │   └── App.css       # Main stylesheet
+│   └── package.json
+└── server/
+    ├── index.js          # Server configuration and API endpoints
+    └── package.json
+```
+
+## Development Guide
+
+### Initial Project Setup
+
+1. Create the "client" and "server" directories
+2. Set up the client:
+   ```bash
+   cd client
+   npx create-react-app .
+   ```
+
+3. Set up the server:
+   ```bash
+   cd server
+   npm init
+   ```
+   Press enter until you see `Is this OK? (yes)` and type "YES"
+
+4. Create `index.js` in the server directory (name must match the "main" field in package.json)
+
+5. Start the client development server:
+   ```bash
+   cd client
+   npm start
+   ```
+   - Edit `client/src/App.js` for application logic
+   - Edit `client/src/App.css` for styling
+
+6. Set up MySQL connection:
+   ```bash
+   npm install mysql2
+   ```
+   Add to `server/index.js`:
+   ```javascript
+   const mysql = require("mysql2");
+
+   const db = mysql.createConnection({
+       host: "localhost",
+       user: "root",
+       password: "",
+       database: "veterinaria"
+   });
+   ```
+
+7. Create API endpoints for appointments in `server/index.js`:
+   ```javascript
+   app.post("/create", (req, res) => {
+       const nombre = req.body.nombre;
+       // This endpoint handles appointment creation
+       // req is used to receive data from the frontend
+       // res is used to send responses back to the frontend
+       // Additional logic here for database operations
+   });
+   ```
+   This creates an endpoint that will handle appointment creation requests from the frontend.
+
+8. Set up Axios for API requests. Axios will facilitate making HTTP requests to the backend:
+   ```bash
+   npm install axios
+   ```
+   In `App.js`, import and use Axios for making API calls:
+   ```javascript
+   import axios from 'axios';
+
+   const add = () => {
+       // This method will send data to our backend endpoint
+       // The port (3001) must match the one configured in your server's index.js
+       axios.post("http://localhost:3001/create", {
+           // Add your data here
+           // Example: nombre: nombreInput
+       }).then((response) => {
+           // Handle successful response
+       }).catch((error) => {
+           // Handle any errors
+       });
+   }
+   ```
+
+9. Install and configure CORS:
+   ```bash
+   npm install cors
+   ```
+   Add to `server/index.js`:
+   ```javascript
+   const cors = require("cors");
+   app.use(cors());
+   app.use(express.json());
+   ```
+
+10. Install Bootstrap:
+    ```bash
+    npm install react-bootstrap bootstrap
+    ```
+    Add to `App.js`:
+    ```javascript
+    import 'bootstrap/dist/css/bootstrap.min.css';
+    ```
+
+### Troubleshooting
+
+#### MySQL Authentication Issues
+
+If you encounter authentication problems:
+
+1. Log into MySQL:
+   ```bash
+   mysql -u root -p
+   ```
+
+2. Update authentication method:
+   ```sql
+   ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'your_password';
+   FLUSH PRIVILEGES;
+   exit;
+   ```
+
+Common issues and solutions:
+- CORS errors: When trying to add an appointment, you might encounter a "blocked by CORS" error. This is solved by installing and configuring the cors middleware as shown in the CORS Configuration section.
+- MySQL authentication: If you experience authentication issues, it's usually because the MySQL authentication method is not compatible with the Node.js client. This can be fixed by updating to mysql_native_password authentication as shown in the MySQL Authentication Issues section.
+- MySQL compatibility: Initial development encountered issues with mysql@2.18.1, which was resolved by switching to mysql2 for better compatibility with recent MySQL versions.
+- General database connectivity: If you're having trouble connecting to the database, ensure your MySQL service is running and the credentials in your connection configuration match your MySQL setup.
+
+### Database Configuration
+
+Server database connection:
+```javascript
 const db = mysql.createConnection({
     host: "localhost",
     user: "root",
     password: "",
     database: "veterinaria"
-});"
+});
+```
 
+### CORS Configuration
 
-7. Para ser capaces de crear citas en la base de datos, en el mismo index colocamos 
-"app.post("/create),(req,res)=>{
-    const nombre = req.body.nombre;
-})" donde req va a ser para realizar las consultas, es para recibir respuesta
-
-8. Ahora, para facilitar las peticiones al backend vamos a importar AXIOS.
-"npm install axios". Posterior a descargar axios, dentro de app.js vamos a importar axios y utilizar los métodos para agregar, editar o eliminar consultas de SQL.
-Dentro de la misma, vamos a crear 
-"const add = ()=>{
-    Axios.post("http:://localhost:3001/create")
-}"
-donde 3001 es el puerto que hemos colocado en index.js, de igual forma que create
-
-8. Alguno de los errores que nos dió al tratar de conectarnos a la base de datos: 
-Si tratamos de agregar una cita nos dará un "blocked by CORS", para ello tenemos que, en consola:
-"npm install cors".
-Posterior colocamos en el archivo index.js
-"const cors =require("cors");".
-Ahora, para que nuestra app use este cors antes de ejecutar, más abajo del archivo colocamos 
-"app.use(cors());" y 
-"app.use(express.json());" lo que hará que toda la información que agregue se convierta en JSON
-Un error común al tratar de conectarnos a la base de datos es que cuando el método de autenticación de MySQL no es compatible con el cliente Node.js. Para esto lo solucionaremos colocando en el terminal 
-"mysql -u root -p", colocamos nuestra clave y posteriormente:
-"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '(Aqui tu contraseña)';
-FLUSH PRIVILEGES;
-exit;"
-Finalmente, el error encontrado fue la incopatibilidad al instalar mysql@2.18.1, por lo que se procedió a utilizar msyql2 que funciona correctamente con las últimas versiones de MYSQL.
-
-9. Vamos a descargar React Bootstrap para poder tener un mejor manejo en la interface del programa. Para eso, vamos a colocar en el terminal del cliente "npm install react-bootstrap bootstrap". Y, dentro de App, bajo de axios vamos a colocar
-"import 'bootstrap/dist/css/bootstrap.min.css';"
+Enable CORS and JSON parsing:
+```javascript
+const cors = require("cors");
+app.use(cors());
+app.use(express.json());
+```
