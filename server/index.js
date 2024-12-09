@@ -72,319 +72,295 @@ app.get("/test-db", (req, res) => {
     });
 });
 
-// Crear cita 
+//crear cita
 app.post("/create", (req, res) => {
     const { fecha, motivo, estado, hora, mascotas_idmascotas, veterinarios_idveterinarios } = req.body;
-
-    console.log("Datos recibidos:", {
-        fecha, hora, motivo, estado, mascotas_idmascotas, veterinarios_idveterinarios
-    });
-
-    if (!fecha || !motivo || !estado || !hora || !mascotas_idmascotas || !veterinarios_idveterinarios) {
-        return res.status(400).json({
-            error: "Todos los campos son requeridos",
-            receivedData: { fecha, motivo, estado, hora, mascotas_idmascotas, veterinarios_idveterinarios }
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            'INSERT INTO citas(idcitas,fecha,hora,motivo,estado,mascotas_idmascotas,veterinarios_idveterinarios) VALUES(DEFAULT,?,?,?,?,?,?)',
-            [fecha, hora, motivo, estado, mascotas_idmascotas, veterinarios_idveterinarios],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la inserción:", error);
-                        res.status(500).json({
-                            error: "Error al registrar la cita",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Cita Registrada con éxito", id: result.insertId });
+    
+    db.query(
+        'CALL sp_crear_cita(?, ?, ?, ?, ?, ?, @resultado, @id_generado)',
+        [fecha, hora, motivo, estado, mascotas_idmascotas, veterinarios_idveterinarios],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al registrar la cita",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            // Obtener los valores de salida
+            db.query(
+                'SELECT @resultado as resultado, @id_generado as id_generado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado, id_generado } = results[0];
+                    
+                    if (id_generado === 0) {
+                        return res.status(400).json({
+                            error: resultado
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado,
+                        id: id_generado
+                    });
+                }
+            );
+        }
+    );
 });
 
 // Actualizar cita 
 app.put("/update-cita/:id", (req, res) => {
     const id = req.params.id;
     const { fecha, hora, motivo, estado, mascotas_idmascotas, veterinarios_idveterinarios } = req.body;
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        const query = `
-            UPDATE citas
-            SET fecha = ?, hora = ?, motivo = ?, estado = ?, 
-                mascotas_idmascotas = ?, veterinarios_idveterinarios = ?
-            WHERE idcitas = ?`;
-
-        db.query(
-            query,
-            [fecha, hora, motivo, estado, mascotas_idmascotas, veterinarios_idveterinarios, id],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la actualización:", error);
-                        res.status(500).json({
-                            error: "Error al actualizar la cita",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Cita actualizada con éxito" });
+    
+    db.query(
+        'CALL sp_actualizar_cita(?, ?, ?, ?, ?, ?, ?, @resultado)',
+        [id, fecha, hora, motivo, estado, mascotas_idmascotas, veterinarios_idveterinarios],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al actualizar la cita",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            // Obtener el resultado
+            db.query(
+                'SELECT @resultado as resultado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado } = results[0];
+                    
+                    if (resultado === 'La cita no existe') {
+                        return res.status(404).json({
+                            error: resultado
+                        });
+                    }
+                    
+                    if (resultado.startsWith('Error')) {
+                        return res.status(500).json({
+                            error: resultado
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado
+                    });
+                }
+            );
+        }
+    );
 });
 
 // Eliminar cita 
 app.delete("/delete-cita/:id", (req, res) => {
     const id = req.params.id;
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            "DELETE FROM citas WHERE idcitas = ?",
-            [id],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la eliminación:", error);
-                        res.status(500).json({
-                            error: "Error al eliminar la cita",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Cita eliminada con éxito" });
+    
+    db.query(
+        'CALL sp_eliminar_cita(?, @resultado)',
+        [id],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al eliminar la cita",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            // Obtener el resultado
+            db.query(
+                'SELECT @resultado as resultado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado } = results[0];
+                    
+                    if (resultado === 'La cita no existe') {
+                        return res.status(404).json({
+                            error: resultado
+                        });
+                    }
+                    
+                    if (resultado.startsWith('Error')) {
+                        return res.status(500).json({
+                            error: resultado
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado
+                    });
+                }
+            );
+        }
+    );
 });
 
 //Crear mascota
 app.post("/create-mascota", (req, res) => {
-    console.log("Cuerpo completo:", req.body);
-    
     const { nombre, fechanacimiento, peso, especies_idespecies, duenos_idduenos } = req.body;
-  
-    if (!nombre || !fechanacimiento || !peso || !especies_idespecies || !duenos_idduenos) {
-      return res.status(400).json({
-        error: "Todos los campos son requeridos",
-        receivedData: req.body
-      });
-    }
-  
-    db.beginTransaction(err => {
-      if (err) {
-        console.error("Error al iniciar la transacción:", err);
-        return res.status(500).json({
-          error: "Error al iniciar la transacción",
-          details: err.message
-        });
-      }
-      
-      // Corregido el nombre del campo en la consulta SQL para que coincida con la base de datos
-      db.query(
-        'INSERT INTO mascotas(idmascotas, nombre, fechanacimiento, peso, especies_idespecies, duenos_idduenos) VALUES(DEFAULT, ?, ?, ?, ?, ?)',
+    
+    db.query(
+        'CALL sp_crear_mascota(?, ?, ?, ?, ?, @resultado, @id_generado)',
         [nombre, fechanacimiento, peso, especies_idespecies, duenos_idduenos],
-        (error, result) => {
-          if (error) {
-            return db.rollback(() => {
-              console.error("Error en la inserción:", error);
-              res.status(500).json({
-                error: "Error al registrar la mascota",
-                details: error.message
-              });
-            });
-          }
-          
-          db.commit(err => {
-            if (err) {
-              return db.rollback(() => {
-                res.status(500).json({
-                  error: "Error al finalizar la transacción",
-                  details: err.message
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al registrar la mascota",
+                    details: error.message
                 });
-              });
             }
-            res.json({ message: "Mascota Registrada con éxito", id: result.insertId });
-          });
+            
+            // Obtener los valores de salida
+            db.query(
+                'SELECT @resultado as resultado, @id_generado as id_generado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado, id_generado } = results[0];
+                    
+                    if (id_generado === 0) {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: req.body
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado,
+                        id: id_generado
+                    });
+                }
+            );
         }
-      );
-    });
-  });
+    );
+});
 
 //Crear especie
 app.post("/create-especie", (req, res) => {
-    const { nombre, descripcion} = req.body;
-
-    console.log("Datos recibidos:", {
-        nombre, descripcion
-    });
-
-    if (!nombre || !descripcion) {
-        return res.status(400).json({
-            error: "Todos los campos son requeridos",
-            receivedData: { nombre, descripcion}
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            'INSERT INTO especies(idespecies,nombre, descripcion) VALUES(DEFAULT,?,?)',
-            [nombre, descripcion],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la inserción:", error);
-                        res.status(500).json({
-                            error: "Error al registrar la especie",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Especie Registrada con éxito", id: result.insertId });
+    const { nombre, descripcion } = req.body;
+    
+    db.query(
+        'CALL sp_crear_especie(?, ?, @resultado, @id_generado)',
+        [nombre, descripcion],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al registrar la especie",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            // Obtener los valores de salida
+            db.query(
+                'SELECT @resultado as resultado, @id_generado as id_generado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado, id_generado } = results[0];
+                    
+                    if (id_generado === 0) {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: { nombre, descripcion }
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado,
+                        id: id_generado
+                    });
+                }
+            );
+        }
+    );
 });
 
 //Crear dueno
 app.post("/create-dueno", (req, res) => {
-    const { nombre, apellido, telefono, email, direccion} = req.body;
-
-    console.log("Datos recibidos:", {
-        nombre, apellido, telefono, email, direccion
-    });
-
-    if (!nombre || !apellido || !telefono) {
-        return res.status(400).json({
-            error: "Todos los campos son requeridos",
-            receivedData: { nombre, apellido, telefono, mail, direccion}
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            'INSERT INTO duenos(idduenos, nombre, apellido, telefono, email, direccion) VALUES(DEFAULT,?,?,?,?,?)',
-            [nombre, apellido, telefono, email, direccion],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la inserción:", error);
-                        res.status(500).json({
-                            error: "Error al registrar el dueno",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Dueno Registrada con éxito", id: result.insertId });
+    const { nombre, apellido, telefono, email, direccion } = req.body;
+    
+    db.query(
+        'CALL sp_crear_dueno(?, ?, ?, ?, ?, @resultado, @id_generado)',
+        [nombre, apellido, telefono, email, direccion],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al registrar el dueño",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            // Obtener los valores de salida
+            db.query(
+                'SELECT @resultado as resultado, @id_generado as id_generado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado, id_generado } = results[0];
+                    
+                    if (id_generado === 0) {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: { nombre, apellido, telefono, email, direccion }
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado,
+                        id: id_generado
+                    });
+                }
+            );
+        }
+    );
 });
 
 //actualizar mascota
 app.put("/update-mascota/:id", (req, res) => {
     const id = req.params.id;
     const { nombre, fechanacimiento, peso, especies_idespecies, duenos_idduenos } = req.body;
-
+    
     console.log("ID recibido:", id);
     console.log("Datos recibidos:", {
         nombre,
@@ -393,599 +369,432 @@ app.put("/update-mascota/:id", (req, res) => {
         especies_idespecies,
         duenos_idduenos
     });
-
-    if (!id || !nombre || !fechanacimiento || !peso || !especies_idespecies || !duenos_idduenos) {
-        console.log("Faltan datos requeridos");
-        return res.status(400).json({
-            error: "Todos los campos son requeridos",
-            receivedData: { id, nombre, fechanacimiento, peso, especies_idespecies, duenos_idduenos }
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        const query = `
-            UPDATE mascotas 
-            SET nombre = ?, 
-                fechanacimiento = ?, 
-                peso = ?,
-                especies_idespecies = ?, 
-                duenos_idduenos = ?
-            WHERE idmascotas = ?
-        `;
-
-        console.log("Query a ejecutar:", query);
-        console.log("Valores a usar:", [nombre, fechanacimiento, peso, especies_idespecies, duenos_idduenos, id]);
-
-        db.query(
-            query,
-            [nombre, fechanacimiento, peso, especies_idespecies, duenos_idduenos, id],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la actualización:", error);
-                        res.status(500).json({
-                            error: "Error al actualizar la mascota",
-                            details: error.message,
-                            sqlMessage: error.sqlMessage,
-                            sqlState: error.sqlState
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            console.error("Error en commit:", err);
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    console.log("Actualización exitosa");
-                    res.json({ 
-                        message: "Mascota actualizada con éxito",
-                        affectedRows: result.affectedRows
-                    });
+    
+    db.query(
+        'CALL sp_actualizar_mascota(?, ?, ?, ?, ?, ?, @resultado, @filas_afectadas)',
+        [id, nombre, fechanacimiento, peso, especies_idespecies, duenos_idduenos],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al actualizar la mascota",
+                    details: error.message,
+                    sqlMessage: error.sqlMessage,
+                    sqlState: error.sqlState
                 });
             }
-        );
-    });
+            
+            // Obtener los valores de salida
+            db.query(
+                'SELECT @resultado as resultado, @filas_afectadas as filas_afectadas',
+                (err, results) => {
+                    if (err) {
+                        console.error("Error al obtener resultado:", err);
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado, filas_afectadas } = results[0];
+                    
+                    if (filas_afectadas === 0) {
+                        console.log("No se realizó la actualización:", resultado);
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: { id, nombre, fechanacimiento, peso, especies_idespecies, duenos_idduenos }
+                        });
+                    }
+                    
+                    console.log("Actualización exitosa");
+                    res.json({
+                        message: resultado,
+                        affectedRows: filas_afectadas
+                    });
+                }
+            );
+        }
+    );
 });
 
 //delete mascota
 app.delete("/delete-mascota/:id", (req, res) => {
     const id = req.params.id;
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            "DELETE FROM mascotas WHERE idmascotas = ?",
-            [id],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la eliminación:", error);
-                        res.status(500).json({
-                            error: "Error al eliminar la mascota",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Mascota eliminada con éxito" });
+    
+    db.query(
+        'CALL sp_eliminar_mascota(?, @resultado, @filas_afectadas)',
+        [id],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al eliminar la mascota",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            // Obtener los valores de salida
+            db.query(
+                'SELECT @resultado as resultado, @filas_afectadas as filas_afectadas',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado, filas_afectadas } = results[0];
+                    
+                    if (filas_afectadas === 0) {
+                        return res.status(400).json({
+                            error: resultado
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado
+                    });
+                }
+            );
+        }
+    );
 });
 
-//crear veterinario
+// Crear veterinario
 app.post("/create-veterinario", (req, res) => {
-    const { nombre, apellido, telefono, email} = req.body;
-
-    console.log("Datos recibidos:", {
-        nombre, apellido, telefono, email
-    });
-
-    if (!nombre || !apellido || !telefono || !email) {
-        return res.status(400).json({
-            error: "Todos los campos son requeridos",
-            receivedData: { nombre, apellido, telefono, email}
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            'INSERT INTO veterinarios(idveterinarios, nombre, apellido, telefono, email) VALUES(DEFAULT,?,?,?,?)',
-            [nombre, apellido, telefono, email],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la inserción:", error);
-                        res.status(500).json({
-                            error: "Error al registrar el veterinario",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Veterinario Registrada con éxito", id: result.insertId });
+    const { nombre, apellido, telefono, email } = req.body;
+    
+    db.query(
+        'CALL sp_crear_veterinario(?, ?, ?, ?, @resultado, @id_generado)',
+        [nombre, apellido, telefono, email],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al registrar el veterinario",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            db.query(
+                'SELECT @resultado as resultado, @id_generado as id_generado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado, id_generado } = results[0];
+                    
+                    if (id_generado === 0) {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: { nombre, apellido, telefono, email }
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado,
+                        id: id_generado
+                    });
+                }
+            );
+        }
+    );
 });
 
-//actualizar veterinario
+// Actualizar veterinario
 app.put("/update-veterinario/:id", (req, res) => {
     const id = req.params.id;
     const { nombre, apellido, telefono, email, especialidad_ids } = req.body;
-
+    
     console.log("Updating veterinario with ID:", id);
     console.log("Received data:", req.body);
-
-    if (!id || !nombre || !apellido || !telefono || !email || !especialidad_ids) {
-        return res.status(400).json({
-            error: "Todos los campos son requeridos",
-            receivedData: { id, nombre, apellido, telefono, email, especialidad_ids }
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        // First update veterinario basic info
-        const queryVeterinario = `
-            UPDATE veterinarios 
-            SET nombre = ?, 
-                apellido = ?, 
-                telefono = ?,
-                email = ?
-            WHERE idveterinarios = ?
-        `;
-
-        db.query(queryVeterinario, [nombre, apellido, telefono, email, id], (error, result) => {
+    
+    db.query(
+        'CALL sp_actualizar_veterinario(?, ?, ?, ?, ?, ?, @resultado)',
+        [id, nombre, apellido, telefono, email, especialidad_ids],
+        (error, results) => {
             if (error) {
-                return db.rollback(() => {
-                    console.error("Database error:", error);
-                    res.status(500).json({
-                        error: "Error al actualizar al veterinario",
-                        details: error.message
-                    });
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al actualizar el veterinario",
+                    details: error.message
                 });
             }
-
-            // Then update the specialty relationship
-            // First delete existing relationships
-            const deleteSpecialties = `
-                DELETE FROM veterinarios_has_especialidad
-                WHERE veterinarios_idveterinarios = ?
-            `;
-
-            db.query(deleteSpecialties, [id], (errorDelete) => {
-                if (errorDelete) {
-                    return db.rollback(() => {
-                        console.error("Error deleting specialties:", errorDelete);
-                        res.status(500).json({
-                            error: "Error al actualizar especialidades",
-                            details: errorDelete.message
-                        });
-                    });
-                }
-
-                // Then insert new relationship
-                const insertSpecialty = `
-                    INSERT INTO veterinarios_has_especialidad
-                    (veterinarios_idveterinarios, especialidad_idespecialidad, fecha_certificacion)
-                    VALUES (?, ?, CURRENT_DATE)
-                `;
-
-                db.query(insertSpecialty, [id, especialidad_ids], (errorInsert) => {
-                    if (errorInsert) {
-                        return db.rollback(() => {
-                            console.error("Error inserting specialty:", errorInsert);
-                            res.status(500).json({
-                                error: "Error al insertar especialidad",
-                                details: errorInsert.message
-                            });
+            
+            db.query(
+                'SELECT @resultado as resultado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
                         });
                     }
-
-                    // If everything is OK, commit the transaction
-                    db.commit(err => {
-                        if (err) {
-                            return db.rollback(() => {
-                                res.status(500).json({
-                                    error: "Error al finalizar la transacción",
-                                    details: err.message
-                                });
-                            });
-                        }
-                        res.json({ 
-                            message: "Veterinario y especialidad actualizados con éxito",
-                            affectedRows: result.affectedRows
+                    
+                    const { resultado } = results[0];
+                    
+                    if (resultado.startsWith('Error') || 
+                        resultado === 'El veterinario no existe' ||
+                        resultado === 'La especialidad especificada no existe') {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: { id, nombre, apellido, telefono, email, especialidad_ids }
                         });
+                    }
+                    
+                    res.json({
+                        message: resultado
                     });
-                });
-            });
-        });
-    });
+                }
+            );
+        }
+    );
 });
 
-//delete veterinario
+// Eliminar veterinario
 app.delete("/delete-veterinario/:id", (req, res) => {
     const id = req.params.id;
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            "DELETE FROM veterinarios WHERE idveterinarios = ?",
-            [id],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la eliminación:", error);
-                        res.status(500).json({
-                            error: "Error al eliminar al veterinario",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Veterinario eliminada con éxito" });
+    
+    db.query(
+        'CALL sp_eliminar_veterinario(?, @resultado)',
+        [id],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al eliminar el veterinario",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            db.query(
+                'SELECT @resultado as resultado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado } = results[0];
+                    
+                    if (resultado.startsWith('Error') || 
+                        resultado === 'El veterinario no existe' ||
+                        resultado.includes('tiene citas asociadas')) {
+                        return res.status(400).json({
+                            error: resultado
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado
+                    });
+                }
+            );
+        }
+    );
 });
 
-//crear factura
+// Crear factura
 app.post("/create-factura", (req, res) => {
-    const { fecha_emision, fecha_vencimiento, subtotal, iva, total, 
-        estado_pago, metodo_pago, duenos_idduenos} = req.body;
-
-    console.log("Datos recibidos:", {
-        fecha_emision, fecha_vencimiento, subtotal, iva, total, 
-            estado_pago, metodo_pago, duenos_idduenos
-    });
-
-    if (!fecha_emision || !fecha_vencimiento || !subtotal || !iva || 
-        !total || !estado_pago || !metodo_pago || !duenos_idduenos) {
-        return res.status(400).json({
-            error: "Todos los campos son requeridos",
-            receivedData: { nombre, apellido, telefono, email}
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            'INSERT INTO facturas (fecha_emision, fecha_vencimiento, subtotal, iva, total, estado_pago, metodo_pago, duenos_idduenos) VALUES (?,?,?,?,?,?,?,?)',
-            [fecha_emision, fecha_vencimiento, subtotal, iva, total, estado_pago, metodo_pago, duenos_idduenos],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la inserción:", error);
-                        res.status(500).json({
-                            error: "Error al registrar factura",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Factura Registrada con éxito", id: result.insertId });
+    const { 
+        fecha_emision, fecha_vencimiento, subtotal, iva, total,
+        estado_pago, metodo_pago, duenos_idduenos
+    } = req.body;
+    
+    db.query(
+        'CALL sp_crear_factura(?, ?, ?, ?, ?, ?, ?, ?, @resultado, @id_generado)',
+        [fecha_emision, fecha_vencimiento, subtotal, iva, total, 
+         estado_pago, metodo_pago, duenos_idduenos],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al registrar la factura",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            db.query(
+                'SELECT @resultado as resultado, @id_generado as id_generado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado, id_generado } = results[0];
+                    
+                    if (id_generado === 0) {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: req.body
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado,
+                        id: id_generado
+                    });
+                }
+            );
+        }
+    );
 });
 
-//actualizar factura
+// Actualizar factura
 app.put("/update-factura/:id", (req, res) => {
     const id = req.params.id;
-    const {fecha_emision, fecha_vencimiento, subtotal, iva, total, estado_pago, metodo_pago, duenos_idduenos} = req.body;
-
-    if (!id || !fecha_emision || !fecha_vencimiento || !subtotal || !iva || 
-        !total || !estado_pago || !metodo_pago || !duenos_idduenos) {
-        console.log("Faltan datos requeridos");
-        return res.status(400).json({
-            error: "Todos los campos son requeridos",
-            receivedData: { id, fecha_emision, fecha_vencimiento, subtotal, iva, total, 
-                estado_pago, metodo_pago, duenos_idduenos}
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        const query = `UPDATE facturas 
-         SET fecha_emision = ?, 
-             fecha_vencimiento = ?, 
-             subtotal = ?,
-             iva = ?,
-             total = ?,
-             estado_pago = ?,
-             metodo_pago = ?,
-             duenos_idduenos = ?
-         WHERE idfacturas = ?`;
-
-        db.query(
-            query,
-            [fecha_emision, fecha_vencimiento, subtotal, iva, total, 
-                estado_pago, metodo_pago, id],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la actualización:", error);
-                        res.status(500).json({
-                            error: "Error al actualizar la factura",
-                            details: error.message,
-                            sqlMessage: error.sqlMessage,
-                            sqlState: error.sqlState
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            console.error("Error en commit:", err);
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    console.log("Actualización exitosa");
-                    res.json({ 
-                        message: "Factura actualizada con éxito",
-                        affectedRows: result.affectedRows
-                    });
+    const {
+        fecha_emision, fecha_vencimiento, subtotal, iva, total,
+        estado_pago, metodo_pago, duenos_idduenos
+    } = req.body;
+    
+    db.query(
+        'CALL sp_actualizar_factura(?, ?, ?, ?, ?, ?, ?, ?, ?, @resultado)',
+        [id, fecha_emision, fecha_vencimiento, subtotal, iva, total,
+         estado_pago, metodo_pago, duenos_idduenos],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al actualizar la factura",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            db.query(
+                'SELECT @resultado as resultado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado } = results[0];
+                    
+                    if (resultado !== 'Factura actualizada con éxito') {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: req.body
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado
+                    });
+                }
+            );
+        }
+    );
 });
 
-//delete factura
+// Eliminar factura
 app.delete("/delete-factura/:id", (req, res) => {
     const id = req.params.id;
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            "DELETE FROM facturas WHERE idfacturas = ?",
-            [id],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la eliminación:", error);
-                        res.status(500).json({
-                            error: "Error al eliminar la factura",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Factura eliminada con éxito" });
+    
+    db.query(
+        'CALL sp_eliminar_factura(?, @resultado)',
+        [id],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al eliminar la factura",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            db.query(
+                'SELECT @resultado as resultado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado } = results[0];
+                    
+                    if (resultado !== 'Factura eliminada con éxito') {
+                        return res.status(400).json({
+                            error: resultado
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado
+                    });
+                }
+            );
+        }
+    );
 });
 
-//crear tratamiento
+// Crear tratamiento
 app.post("/create-tratamiento", (req, res) => {
     const {
         diagnostico, 
         fecha_inicio, 
         fecha_fin,
         mascota_id,
-        veterinario_id,  
-        motivo_cita     
+        veterinario_id,
+        motivo_cita
     } = req.body;
-
-    if (!diagnostico || !fecha_inicio || !mascota_id || !veterinario_id || !motivo_cita) {
-        return res.status(400).json({
-            error: "Campos requeridos faltantes"
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        const queryTratamiento = `
-            INSERT INTO tratamientos (
-                diagnostico,
-                fecha_inicio,
-                fecha_fin
-            ) VALUES (?, ?, ?)
-        `;
-
-        db.query(queryTratamiento, [diagnostico, fecha_inicio, fecha_fin], (error, resultTratamiento) => {
+    
+    db.query(
+        'CALL sp_crear_tratamiento(?, ?, ?, ?, ?, ?, @resultado, @id_generado)',
+        [diagnostico, fecha_inicio, fecha_fin, mascota_id, veterinario_id, motivo_cita],
+        (error, results) => {
             if (error) {
-                return db.rollback(() => {
-                    console.error("Error en la inserción del tratamiento:", error);
-                    res.status(500).json({
-                        error: "Error al registrar el tratamiento",
-                        details: error.message
-                    });
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al registrar el tratamiento",
+                    details: error.message
                 });
             }
-
-            const tratamiento_id = resultTratamiento.insertId;
-
-            const queryRelacion = `
-                INSERT INTO mascotas_has_tratamientos 
-                (mascotas_idmascotas, tratamientos_idtratamientos) 
-                VALUES (?, ?)
-            `;
-
-            db.query(queryRelacion, [mascota_id, tratamiento_id], (errorRelacion) => {
-                if (errorRelacion) {
-                    return db.rollback(() => {
-                        console.error("Error en la relación mascota-tratamiento:", errorRelacion);
-                        res.status(500).json({
-                            error: "Error al registrar la relación",
-                            details: errorRelacion.message
-                        });
-                    });
-                }
-
-                const queryCita = `
-                    INSERT INTO citas (
-                        fecha,
-                        motivo,
-                        mascotas_idmascotas,
-                        veterinarios_idveterinarios,
-                        tratamientos_idtratamientos
-                    ) VALUES (?, ?, ?, ?, ?)
-                `;
-
-                db.query(queryCita, 
-                    [fecha_inicio, motivo_cita, mascota_id, veterinario_id, tratamiento_id], 
-                    (errorCita) => {
-                        if (errorCita) {
-                            return db.rollback(() => {
-                                console.error("Error al crear la cita:", errorCita);
-                                res.status(500).json({
-                                    error: "Error al registrar la cita",
-                                    details: errorCita.message
-                                });
-                            });
-                        }
-
-                        db.commit(err => {
-                            if (err) {
-                                return db.rollback(() => {
-                                    res.status(500).json({
-                                        error: "Error en la transacción",
-                                        details: err.message
-                                    });
-                                });
-                            }
-                            
-                            res.json({ 
-                                message: "Tratamiento registrado con éxito",
-                                idTratamiento: tratamiento_id
-                            });
+            
+            db.query(
+                'SELECT @resultado as resultado, @id_generado as id_generado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
                         });
                     }
-                );
-            });
-        });
-    });
+                    
+                    const { resultado, id_generado } = results[0];
+                    
+                    if (id_generado === 0) {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: req.body
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado,
+                        idTratamiento: id_generado
+                    });
+                }
+            );
+        }
+    );
 });
 
-//actualizar tratamiento
+// Actualizar tratamiento
 app.put("/update-tratamiento/:id", (req, res) => {
     const id = req.params.id;
     const {
@@ -993,475 +802,451 @@ app.put("/update-tratamiento/:id", (req, res) => {
         fecha_inicio, 
         fecha_fin,
         mascota_id,
-        veterinario_id,  // Nuevo
-        motivo_cita      // Nuevo
+        veterinario_id,
+        motivo_cita
     } = req.body;
-
-    // Validación básica
-    if (!id || !diagnostico || !fecha_inicio || !mascota_id || !veterinario_id || !motivo_cita) {
-        return res.status(400).json({
-            error: "Todos los campos requeridos son necesarios",
-            receivedData: { id, diagnostico, fecha_inicio, mascota_id, veterinario_id, motivo_cita }
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        // 1. Actualizar el tratamiento
-        const queryTratamiento = `
-            UPDATE tratamientos 
-            SET diagnostico = ?, 
-                fecha_inicio = ?,
-                fecha_fin = ?
-            WHERE idtratamientos = ?
-        `;
-
-        db.query(queryTratamiento, [diagnostico, fecha_inicio, fecha_fin, id], (error, result) => {
+    
+    db.query(
+        'CALL sp_actualizar_tratamiento(?, ?, ?, ?, ?, ?, ?, @resultado)',
+        [id, diagnostico, fecha_inicio, fecha_fin, mascota_id, veterinario_id, motivo_cita],
+        (error, results) => {
             if (error) {
-                return db.rollback(() => {
-                    console.error("Error en la actualización del tratamiento:", error);
-                    res.status(500).json({
-                        error: "Error al actualizar el tratamiento",
-                        details: error.message
-                    });
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al actualizar el tratamiento",
+                    details: error.message
                 });
             }
-
-            // 2. Actualizar la relación mascotas_has_tratamientos
-            const queryRelacion = `
-                UPDATE mascotas_has_tratamientos
-                SET mascotas_idmascotas = ?
-                WHERE tratamientos_idtratamientos = ?
-            `;
-
-            db.query(queryRelacion, [mascota_id, id], (errorRelacion) => {
-                if (errorRelacion) {
-                    return db.rollback(() => {
-                        console.error("Error al actualizar la relación:", errorRelacion);
-                        res.status(500).json({
-                            error: "Error al actualizar la relación mascota-tratamiento",
-                            details: errorRelacion.message
+            
+            db.query(
+                'SELECT @resultado as resultado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
                         });
+                    }
+                    
+                    const { resultado } = results[0];
+                    
+                    if (resultado !== 'Tratamiento y cita actualizados con éxito') {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: req.body
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado
                     });
                 }
-
-                // 3. Actualizar o insertar en citas
-                const queryCitaCheck = `
-                    SELECT idcitas FROM citas 
-                    WHERE tratamientos_idtratamientos = ?
-                `;
-
-                db.query(queryCitaCheck, [id], (errorCheck, resultCheck) => {
-                    if (errorCheck) {
-                        return db.rollback(() => {
-                            console.error("Error al verificar cita existente:", errorCheck);
-                            res.status(500).json({
-                                error: "Error al verificar cita",
-                                details: errorCheck.message
-                            });
-                        });
-                    }
-
-                    let citaQuery;
-                    let citaParams;
-
-                    if (resultCheck.length > 0) {
-                        // Actualizar cita existente
-                        citaQuery = `
-                            UPDATE citas
-                            SET fecha = ?,
-                                motivo = ?,
-                                mascotas_idmascotas = ?,
-                                veterinarios_idveterinarios = ?
-                            WHERE tratamientos_idtratamientos = ?
-                        `;
-                        citaParams = [fecha_inicio, motivo_cita, mascota_id, veterinario_id, id];
-                    } else {
-                        // Insertar nueva cita
-                        citaQuery = `
-                            INSERT INTO citas (fecha, motivo, mascotas_idmascotas, veterinarios_idveterinarios, tratamientos_idtratamientos)
-                            VALUES (?, ?, ?, ?, ?)
-                        `;
-                        citaParams = [fecha_inicio, motivo_cita, mascota_id, veterinario_id, id];
-                    }
-
-                    db.query(citaQuery, citaParams, (errorCita) => {
-                        if (errorCita) {
-                            return db.rollback(() => {
-                                console.error("Error al actualizar/insertar cita:", errorCita);
-                                res.status(500).json({
-                                    error: "Error al actualizar la cita",
-                                    details: errorCita.message
-                                });
-                            });
-                        }
-
-                        db.commit(err => {
-                            if (err) {
-                                return db.rollback(() => {
-                                    res.status(500).json({
-                                        error: "Error al finalizar la transacción",
-                                        details: err.message
-                                    });
-                                });
-                            }
-                            res.json({
-                                message: "Tratamiento y cita actualizados con éxito",
-                                affectedRows: result.affectedRows
-                            });
-                        });
-                    });
-                });
-            });
-        });
-    });
+            );
+        }
+    );
 });
 
-//delete factura
+// Eliminar tratamiento
 app.delete("/delete-tratamiento/:id", (req, res) => {
     const id = req.params.id;
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        // 1. Eliminar la cita relacionada
-        const queryCita = "DELETE FROM citas WHERE tratamientos_idtratamientos = ?";
-        db.query(queryCita, [id], (errorCita) => {
-            if (errorCita) {
-                return db.rollback(() => {
-                    console.error("Error al eliminar la cita:", errorCita);
-                    res.status(500).json({
-                        error: "Error al eliminar la cita relacionada",
-                        details: errorCita.message
-                    });
+    
+    db.query(
+        'CALL sp_eliminar_tratamiento(?, @resultado)',
+        [id],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al eliminar el tratamiento",
+                    details: error.message
                 });
             }
-
-            // 2. Eliminar la relación en mascotas_has_tratamientos
-            const queryRelacion = "DELETE FROM mascotas_has_tratamientos WHERE tratamientos_idtratamientos = ?";
-            db.query(queryRelacion, [id], (errorRelacion) => {
-                if (errorRelacion) {
-                    return db.rollback(() => {
-                        console.error("Error al eliminar la relación:", errorRelacion);
-                        res.status(500).json({
-                            error: "Error al eliminar la relación mascota-tratamiento",
-                            details: errorRelacion.message
-                        });
-                    });
-                }
-
-                // 3. Finalmente eliminar el tratamiento
-                const queryTratamiento = "DELETE FROM tratamientos WHERE idtratamientos = ?";
-                db.query(queryTratamiento, [id], (error, result) => {
-                    if (error) {
-                        return db.rollback(() => {
-                            console.error("Error al eliminar el tratamiento:", error);
-                            res.status(500).json({
-                                error: "Error al eliminar el tratamiento",
-                                details: error.message
-                            });
+            
+            db.query(
+                'SELECT @resultado as resultado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
                         });
                     }
-
-                    db.commit(err => {
-                        if (err) {
-                            return db.rollback(() => {
-                                res.status(500).json({
-                                    error: "Error al finalizar la transacción",
-                                    details: err.message
-                                });
-                            });
-                        }
-                        res.json({ 
-                            message: "Tratamiento y registros relacionados eliminados con éxito",
-                            affectedRows: result.affectedRows 
+                    
+                    const { resultado } = results[0];
+                    
+                    if (resultado !== 'Tratamiento y registros relacionados eliminados con éxito') {
+                        return res.status(400).json({
+                            error: resultado
                         });
+                    }
+                    
+                    res.json({
+                        message: resultado
                     });
-                });
-            });
-        });
-    });
+                }
+            );
+        }
+    );
 });
 
 //create especialidad
 app.post("/create-especialidad", (req, res) => {
-    const { nombre, descripcion, anios_requeridos} = req.body;
-
+    const { nombre, descripcion, anios_requeridos } = req.body;
+    
     console.log("Datos recibidos:", {
         nombre, descripcion, anios_requeridos
     });
-
-    if (!nombre || !descripcion || !anios_requeridos) {
-        return res.status(400).json({
-            error: "Todos los campos son requeridos",
-            receivedData: { nombre, descripcion, anios_requeridos}
-        });
-    }
-
-    db.beginTransaction(err => {
-        if (err) {
-            console.error("Error al iniciar la transacción:", err);
-            return res.status(500).json({
-                error: "Error al iniciar la transacción",
-                details: err.message
-            });
-        }
-
-        db.query(
-            'INSERT INTO especialidad(idespecialidad, nombre, descripcion, anios_requeridos) VALUES(DEFAULT,?,?,?)',
-            [nombre, descripcion, anios_requeridos],
-            (error, result) => {
-                if (error) {
-                    return db.rollback(() => {
-                        console.error("Error en la inserción:", error);
-                        res.status(500).json({
-                            error: "Error al registrar la especialidad",
-                            details: error.message
-                        });
-                    });
-                }
-
-                db.commit(err => {
-                    if (err) {
-                        return db.rollback(() => {
-                            res.status(500).json({
-                                error: "Error al finalizar la transacción",
-                                details: err.message
-                            });
-                        });
-                    }
-                    res.json({ message: "Especialidad Registrada con éxito", id: result.insertId });
+    
+    db.query(
+        'CALL sp_crear_especialidad(?, ?, ?, @resultado, @id_generado)',
+        [nombre, descripcion, anios_requeridos],
+        (error, results) => {
+            if (error) {
+                console.error("Error al llamar al SP:", error);
+                return res.status(500).json({
+                    error: "Error al registrar la especialidad",
+                    details: error.message
                 });
             }
-        );
-    });
+            
+            db.query(
+                'SELECT @resultado as resultado, @id_generado as id_generado',
+                (err, results) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al obtener el resultado",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { resultado, id_generado } = results[0];
+                    
+                    if (id_generado === 0) {
+                        return res.status(400).json({
+                            error: resultado,
+                            receivedData: { nombre, descripcion, anios_requeridos }
+                        });
+                    }
+                    
+                    res.json({
+                        message: resultado,
+                        id: id_generado
+                    });
+                }
+            );
+        }
+    );
 });
+
+
 
 // Rutas de consulta
+// Obtener todas las mascotas
 app.get("/mascotas-info", (req, res) => {
-    db.query("SELECT * FROM v_mascotas_info ORDER BY mascota_nombre", (err, result) => {
-        if (err) {
-            console.log(err);
-            res.status(500).send(err);
-        } else {
-            res.send(result);
+    db.query(
+        'CALL sp_obtener_mascotas_info()',
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener mascotas:", error);
+                return res.status(500).json({
+                    error: "Error al cargar mascotas",
+                    details: error.message
+                });
+            }
+            
+            // En los resultados de un SP, la primera posición contiene los registros
+            res.json(results[0]);
         }
-    });
+    );
 });
 
+// Obtener información de una mascota específica
 app.get("/mascotas-info-tratamiento/:id", (req, res) => {
     const id = req.params.id;
+    
     db.query(
-        `SELECT * FROM v_mascotas_info WHERE idmascotas = ?`,
+        'CALL sp_obtener_mascota_info(?, @encontrado)',
         [id],
-        (err, result) => {
-            if (err) {
-                console.log(err);
-                res.status(500).send(err);
-            } else {
-                res.send(result[0]);
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener mascota:", error);
+                return res.status(500).json({
+                    error: "Error al cargar información de la mascota",
+                    details: error.message
+                });
             }
+            
+            db.query(
+                'SELECT @encontrado as encontrado',
+                (err, checkResults) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al verificar existencia de mascota",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { encontrado } = checkResults[0];
+                    
+                    if (!encontrado) {
+                        return res.status(404).json({
+                            error: "Mascota no encontrada"
+                        });
+                    }
+                    
+                    // El primer elemento del array contiene los resultados de la consulta
+                    res.json(results[0][0]);
+                }
+            );
         }
     );
 });
 
+// Obtener información de veterinarios
 app.get("/veterinarios-info", (req, res) => {
-    const query = `
-        SELECT 
-            v.idveterinarios,
-            v.nombre,
-            v.apellido,
-            v.telefono,
-            v.email,
-            v.especialidades,
-            v.especialidad_ids
-        FROM v_veterinarios_info v
-        ORDER BY v.nombre, v.apellido
-    `;
-    
-    db.query(query, (err, result) => {
-        if (err) {
-            console.error("Error al obtener veterinarios:", err);
-            res.status(500).json({
-                error: "Error al cargar veterinarios",
-                details: err.message
-            });
-        } else {
+    db.query(
+        'CALL sp_obtener_veterinarios_info()',
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener veterinarios:", error);
+                return res.status(500).json({
+                    error: "Error al cargar veterinarios",
+                    details: error.message
+                });
+            }
+            
             // Log the data being sent
-            console.log("Datos de veterinarios enviados:", result);
-            res.json(result);
+            console.log("Datos de veterinarios enviados:", results[0]);
+            res.json(results[0]);
         }
-    });
+    );
 });
 
+// Obtener información de facturas
 app.get("/facturas-info", (req, res) => {
-    db.query("SELECT * FROM v_facturas_completas ORDER BY idfacturas", (err, result) => {
-        if (err) {
-            console.log(err);
-            res.status(500).send(err);
-        } else {
-            res.send(result);
+    db.query(
+        'CALL sp_obtener_facturas_info()',
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener facturas:", error);
+                return res.status(500).json({
+                    error: "Error al cargar facturas",
+                    details: error.message
+                });
+            }
+            
+            res.json(results[0]);
         }
-    });
+    );
 });
 
+// Obtener información de citas completas
 app.get("/citas_completas", (req, res) => {
-    const query = `
-      SELECT v.*, c.mascotas_idmascotas, c.veterinarios_idveterinarios 
-      FROM vista_citas_completa v
-      JOIN citas c ON v.idcitas = c.idcitas
-      ORDER BY v.idcitas
-    `;
-    
-    db.query(query, (err, result) => {
-      if (err) {
-        console.log(err);
-        res.status(500).send(err);
-      } else {
-        res.send(result);
-      }
-    });
-  });
-
-app.get("/tratamientos-mascotas", (req, res) => {
-    const query = `SELECT * FROM v_tratamientos_mascotas ORDER BY mascota_nombre`;
-    
-    db.query(query, (err, result) => {
-        if (err) {
-            console.error('Error al consultar tratamientos_mascotas:', err);
-            res.status(500).json({
-                error: 'Error en la consulta',
-                details: err.message
-            });
-            return;
+    db.query(
+        'CALL sp_obtener_citas_completas()',
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener citas:", error);
+                return res.status(500).json({
+                    error: "Error al cargar citas",
+                    details: error.message
+                });
+            }
+            
+            res.json(results[0]);
         }
-        res.json(result);
-    });
+    );
 });
 
+// Obtener información de tratamientos y mascotas
+app.get("/tratamientos-mascotas", (req, res) => {
+    db.query(
+        'CALL sp_obtener_tratamientos_mascotas()',
+        (error, results) => {
+            if (error) {
+                console.error('Error al consultar tratamientos_mascotas:', error);
+                return res.status(500).json({
+                    error: 'Error en la consulta',
+                    details: error.message
+                });
+            }
+            
+            res.json(results[0]);
+        }
+    );
+});
+
+// Obtener tratamientos por mascota
 app.get("/tratamientos-by-mascota/:idMascota", (req, res) => {
     const idMascota = req.params.idMascota;
-    const query = `
-        SELECT
-            t.idtratamientos,
-            t.diagnostico,
-            t.fecha_inicio,
-            t.fecha_fin,
-            m.nombre as nombre_mascota,
-            m.idmascotas,
-            mht.mascotas_idmascotas,
-            mht.tratamientos_idtratamientos,
-            c.motivo as motivo_cita,
-            CONCAT(v.nombre, ' ', v.apellido) as nombre_veterinario,
-            v.idveterinarios
-        FROM tratamientos t
-        INNER JOIN mascotas_has_tratamientos mht ON t.idtratamientos = mht.tratamientos_idtratamientos
-        INNER JOIN mascotas m ON mht.mascotas_idmascotas = m.idmascotas
-        LEFT JOIN citas c ON t.idtratamientos = c.tratamientos_idtratamientos
-        LEFT JOIN veterinarios v ON c.veterinarios_idveterinarios = v.idveterinarios
-        WHERE m.idmascotas = ?
-    `;
-
-    db.query(query, [idMascota], (error, results) => {
-        if (error) {
-            console.error("Error al obtener tratamientos:", error);
-            res.status(500).json({ error: "Error al obtener tratamientos" });
-            return;
+    
+    db.query(
+        'CALL sp_obtener_tratamientos_por_mascota(?, @encontrado)',
+        [idMascota],
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener tratamientos:", error);
+                return res.status(500).json({
+                    error: "Error al obtener tratamientos",
+                    details: error.message
+                });
+            }
+            
+            db.query(
+                'SELECT @encontrado as encontrado',
+                (err, checkResults) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al verificar existencia de mascota",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { encontrado } = checkResults[0];
+                    
+                    if (!encontrado) {
+                        return res.status(404).json({
+                            error: "Mascota no encontrada"
+                        });
+                    }
+                    
+                    console.log("Tratamientos encontrados:", results[0]);
+                    res.json(results[0]);
+                }
+            );
         }
-        console.log("Tratamientos encontrados:", results);
-        res.json(results);
-    });
+    );
 });
 
+// Obtener especies
 app.get("/especies", (req, res) => {
-    db.query("SELECT * FROM especies ORDER BY idespecies", (err, result) => {
-        if (err) {
-            console.log(err);
-            res.status(500).send(err);
-        } else {
-            res.send(result);
+    db.query(
+        'CALL sp_obtener_especies()',
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener especies:", error);
+                return res.status(500).json({
+                    error: "Error al cargar especies",
+                    details: error.message
+                });
+            }
+            
+            res.json(results[0]);
         }
-    });
+    );
 });
 
+// Obtener dueños
 app.get("/duenos", (req, res) => {
-    db.query("SELECT * FROM duenos ORDER BY idduenos", (err, result) => {
-        if (err) {
-            console.log(err);
-            res.status(500).send(err);
-        } else {
-            res.send(result);
+    db.query(
+        'CALL sp_obtener_duenos()',
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener dueños:", error);
+                return res.status(500).json({
+                    error: "Error al cargar dueños",
+                    details: error.message
+                });
+            }
+            
+            res.json(results[0]);
         }
-    });
+    );
 });
 
+// Obtener todas las mascotas
 app.get("/mascotas", (req, res) => {
-    db.query("SELECT * FROM mascotas ORDER BY idmascotas", (err, result) => {
-        if (err) {
-            console.log(err);
-            res.status(500).send(err);
-        } else {
-            res.send(result);
+    db.query(
+        'CALL sp_obtener_mascotas()',
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener mascotas:", error);
+                return res.status(500).json({
+                    error: "Error al cargar mascotas",
+                    details: error.message
+                });
+            }
+            
+            res.json(results[0]);
         }
-    });
+    );
 });
 
+// Obtener motivos de cita
 app.get("/motivos-cita", (req, res) => {
     db.query(
-      "SELECT DISTINCT motivo FROM citas ORDER BY motivo",
-      (err, result) => {
-        if (err) {
-          console.error("Error al obtener motivos de cita:", err);
-          res.status(500).json({ error: "Error al cargar motivos de cita" });
-        } else {
-          res.json(result);
+        'CALL sp_obtener_motivos_cita()',
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener motivos de cita:", error);
+                return res.status(500).json({
+                    error: "Error al cargar motivos de cita",
+                    details: error.message
+                });
+            }
+            
+            res.json(results[0]);
         }
-      }
     );
-  });
-
-app.get("/especialidades", (req, res) => {
-    db.query("SELECT * FROM especialidad", (err, result) => {
-        if (err) {
-            console.log(err);
-            res.status(500).send(err);
-        } else {
-            res.send(result);
-        }
-    });
 });
 
+// Obtener especialidades
+app.get("/especialidades", (req, res) => {
+    db.query(
+        'CALL sp_obtener_especialidades()',
+        (error, results) => {
+            if (error) {
+                console.error("Error al obtener especialidades:", error);
+                return res.status(500).json({
+                    error: "Error al cargar especialidades",
+                    details: error.message
+                });
+            }
+            
+            res.json(results[0]);
+        }
+    );
+});
+
+// Obtener especialidad de un veterinario
 app.get("/veterinario-especialidad/:id", (req, res) => {
     const id = req.params.id;
-    const query = `
-        SELECT * FROM veterinarios_has_especialidad
-        WHERE veterinarios_idveterinarios = ?
-    `;
     
-    db.query(query, [id], (error, result) => {
-        if (error) {
-            console.error("Error getting specialty:", error);
-            res.status(500).json({
-                error: "Error al obtener especialidad",
-                details: error.message
-            });
-        } else {
-            res.json(result);
+    db.query(
+        'CALL sp_obtener_veterinario_especialidad(?, @encontrado)',
+        [id],
+        (error, results) => {
+            if (error) {
+                console.error("Error getting specialty:", error);
+                return res.status(500).json({
+                    error: "Error al obtener especialidad",
+                    details: error.message
+                });
+            }
+            
+            db.query(
+                'SELECT @encontrado as encontrado',
+                (err, checkResults) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: "Error al verificar existencia de veterinario",
+                            details: err.message
+                        });
+                    }
+                    
+                    const { encontrado } = checkResults[0];
+                    
+                    if (!encontrado) {
+                        return res.status(404).json({
+                            error: "Veterinario no encontrado"
+                        });
+                    }
+                    
+                    res.json(results[0]);
+                }
+            );
         }
-    });
+    );
 });
 
 app.listen(3001, () => {
